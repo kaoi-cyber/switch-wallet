@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Switch Wallet</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f6c945'/%3E%3Ctext x='32' y='45' font-family='Arial' font-weight='bold' font-size='38' text-anchor='middle' fill='%23a51931'%3E%E0%B8%BF%3C/text%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23f6c945'/%3E%3Ctext x='32' y='45' font-family='Arial' font-weight='bold' font-size='38' text-anchor='middle' fill='%23a51931'%3E%E0%B8%BF%3C/text%3E%3C/svg%3E" />
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          ink: { 950: '#0a0920', 900: '#110f30', 800: '#1a1742', 700: '#252156', 600: '#322d6c' },
+          shift: { 400: '#f6c945', 500: '#e0a422', 600: '#b97f10' },
+          siam: { red: '#a51931', blue: '#2d2a4a', white: '#f4f5f8' },
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body {
+    background-color: #0a0920;
+    background-image:
+      radial-gradient(700px 420px at 12% 0%, rgba(165, 25, 49, .45) 0%, transparent 70%),
+      radial-gradient(700px 420px at 90% 100%, rgba(45, 42, 140, .55) 0%, transparent 70%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%23f6c945' stroke-opacity='.09' stroke-width='1.2'%3E%3Cpath d='M28 4l10 10-10 10-10-10z'/%3E%3Cpath d='M28 32l10 10-10 10-10-10z'/%3E%3Cpath d='M0 18l10 10L0 38M56 18L46 28l10 10'/%3E%3Ccircle cx='28' cy='14' r='2.5'/%3E%3Ccircle cx='28' cy='42' r='2.5'/%3E%3C/g%3E%3C/svg%3E");
+    background-attachment: fixed;
+  }
+  /* Thai flag stripes: red / white / blue (double) / white / red */
+  .flag-stripe { background: linear-gradient(180deg, #a51931 0 16.66%, #f4f5f8 16.66% 33.33%, #2d2a4a 33.33% 66.66%, #f4f5f8 66.66% 83.33%, #a51931 83.33%); }
+  .flag-stripe-h { background: linear-gradient(90deg, #a51931 0 16.66%, #f4f5f8 16.66% 33.33%, #2d2a4a 33.33% 66.66%, #f4f5f8 66.66% 83.33%, #a51931 83.33%); }
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity .35s ease, transform .35s ease; }
+  .screen.hidden-screen { opacity: 0; transform: translateX(24px); pointer-events: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+  .glow { box-shadow: 0 10px 40px -10px rgba(246, 201, 69, .45); }
+  .card-grad { background: linear-gradient(135deg, #a51931 0%, #6d1236 42%, #2d2a4a 100%); }
+  .scan-line { animation: scan 2.2s ease-in-out infinite; }
+  @keyframes scan { 0%,100% { top: 8%; } 50% { top: 88%; } }
+  .fade-in { animation: fadeIn .3s ease both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .sheet-in { animation: sheetIn .3s cubic-bezier(.2,.9,.3,1) both; }
+  @keyframes sheetIn { from { transform: translateY(100%); } to { transform: none; } }
+  .pop { animation: pop .5s cubic-bezier(.2,1.4,.4,1) both; }
+  @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  #reader video { object-fit: cover; width: 100% !important; height: 100% !important; border-radius: 1rem; }
+  #reader { border: none !important; }
+  #reader img[alt="Info icon"], #reader__dashboard_section_csr span { display: none !important; }
+  .slider-track { touch-action: none; user-select: none; }
+</style>
+</head>
+<body class="min-h-screen font-sans text-slate-100 antialiased flex items-center justify-center md:p-8">
+
+<!-- Phone frame: full-screen on mobile, framed device on desktop -->
+<div class="relative w-full h-[100dvh] md:w-[400px] md:h-[840px] md:rounded-[3rem] md:border-[10px] md:border-black md:shadow-[0_40px_120px_-20px_rgba(0,0,0,.8),0_0_0_2px_#2a2f3a] bg-ink-950 overflow-hidden">
+  <!-- Notch (desktop only) -->
+  <div class="hidden md:block absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-black rounded-b-2xl z-50"></div>
+
+  <!-- Status bar -->
+  <div class="absolute top-0 inset-x-0 h-10 px-7 flex items-center justify-between text-[11px] font-semibold text-slate-300 z-40 pointer-events-none">
+    <span id="clock">9:41</span>
+    <span class="flex items-center gap-1.5">
+      <svg width="16" height="10" viewBox="0 0 16 10" fill="currentColor"><rect x="0" y="6" width="3" height="4" rx="1"/><rect x="4.3" y="4" width="3" height="6" rx="1"/><rect x="8.6" y="2" width="3" height="8" rx="1"/><rect x="13" y="0" width="3" height="10" rx="1"/></svg>
+      <svg width="22" height="11" viewBox="0 0 22 11" fill="none"><rect x=".5" y=".5" width="18" height="10" rx="2.5" stroke="currentColor" opacity=".5"/><rect x="2" y="2" width="14" height="7" rx="1.5" fill="currentColor"/><rect x="19.5" y="3.5" width="1.5" height="4" rx=".75" fill="currentColor" opacity=".5"/></svg>
+    </span>
+  </div>
+
+  <!-- ============ SCREEN 1: HOME / WALLET ============ -->
+  <section id="screen-home" class="screen pt-12">
+    <div class="flex-1 overflow-y-auto no-scrollbar px-5 pb-8">
+      <header class="flex items-center justify-between py-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-shift-400 to-shift-600 ring-2 ring-siam-red/60 grid place-items-center font-extrabold text-siam-red">฿</div>
+          <div>
+            <div class="font-bold text-[17px] leading-tight tracking-tight">Switch Wallet</div>
+            <div class="text-[11px] text-slate-400 leading-tight">Crypto → PromptPay</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+        <div id="wallet-badge" class="hidden items-center gap-2 bg-emerald-500/10 border border-emerald-400/30 text-emerald-300 rounded-full pl-2 pr-3 py-1.5 text-xs font-semibold">
+          <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span></span>
+          <span id="wallet-badge-addr" class="font-mono">0x71C…3A9f</span>
+        </div>
+        <button id="btn-settings" class="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 grid place-items-center shrink-0" aria-label="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        </div>
+      </header>
+
+      <!-- Connect wallet CTA -->
+      <button id="btn-connect" class="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl py-4 font-semibold bg-white text-ink-950 hover:bg-slate-100 active:scale-[.98] transition">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+        Connect Wallet
+      </button>
+
+      <!-- Balance card -->
+      <div class="mt-5 card-grad rounded-3xl p-5 relative overflow-hidden">
+        <div class="flag-stripe-h absolute top-0 inset-x-0 h-1.5 opacity-90"></div>
+        <svg class="absolute -right-3 bottom-0 h-[85%] text-shift-400/15" viewBox="0 0 100 120" fill="currentColor" aria-hidden="true"><path d="M50 0 L52 28 L56 36 L54 38 L60 50 L57 52 L66 68 L62 70 L74 90 L70 92 L84 120 L16 120 L30 92 L26 90 L38 70 L34 68 L43 52 L40 50 L46 38 L44 36 L48 28 Z"/></svg>
+        <div class="flex items-center justify-between relative">
+          <span class="text-xs uppercase tracking-widest text-rose-100/70 font-semibold">Available balance</span>
+          <span id="wallet-name" class="text-[11px] bg-white/10 rounded-full px-2.5 py-1 text-rose-50">Not connected</span>
+        </div>
+        <div class="mt-3 flex items-end gap-2 relative">
+          <span id="balance" class="text-4xl font-extrabold tracking-tight">0.00</span>
+          <span class="text-base font-semibold text-rose-100/80 mb-1">USDT</span>
+        </div>
+        <div class="mt-1 text-sm text-rose-100/70 relative">≈ <span id="balance-thb">0.00</span> THB</div>
+        <div class="mt-5 flex items-center gap-2 text-[11px] text-rose-50/80 relative">
+          <span class="inline-flex items-center gap-1 bg-black/20 rounded-full px-2.5 py-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> <span class="rate-text">1 USDT = 33.50 THB</span>
+          </span>
+          <span class="inline-flex items-center gap-1 bg-black/20 rounded-full px-2.5 py-1" id="network-chip">Demo</span>
+        </div>
+      </div>
+
+      <!-- Scan CTA -->
+      <button id="btn-scan" class="mt-6 w-full rounded-3xl p-5 bg-gradient-to-r from-amber-200 via-shift-400 to-shift-500 text-ink-950 glow active:scale-[.98] transition flex items-center gap-4 text-left">
+        <div class="w-14 h-14 rounded-2xl bg-ink-950/90 grid place-items-center shrink-0">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f6c945" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="4" height="4" rx=".5"/><rect x="13" y="13" width="4" height="4" rx=".5"/><path d="M13 7h4v4"/><path d="M7 13v4h4"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="text-lg font-extrabold leading-tight">Scan PromptPay QR</div>
+          <div class="text-sm font-medium text-ink-950/70">Pay any Thai merchant with USDT</div>
+        </div>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+
+      <!-- Feature row -->
+      <div class="mt-6 grid grid-cols-3 gap-3">
+        <div class="bg-ink-800 rounded-2xl p-3 border border-white/5">
+          <div class="text-lg">🔐</div><div class="mt-1 text-[11px] font-semibold leading-tight">Self-custody</div><div class="text-[10px] text-slate-400 leading-tight mt-0.5">Your keys, always</div>
+        </div>
+        <div class="bg-ink-800 rounded-2xl p-3 border border-white/5">
+          <div class="text-lg">⚡</div><div class="mt-1 text-[11px] font-semibold leading-tight">Instant THB</div><div class="text-[10px] text-slate-400 leading-tight mt-0.5">Merchant gets baht</div>
+        </div>
+        <div class="bg-ink-800 rounded-2xl p-3 border border-white/5">
+          <div class="text-lg">🏛️</div><div class="mt-1 text-[11px] font-semibold leading-tight">Licensed rails</div><div class="text-[10px] text-slate-400 leading-tight mt-0.5">3rd-party settlement</div>
+        </div>
+      </div>
+
+      <!-- Activity -->
+      <div class="mt-7">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold">Recent activity</h3>
+          <span class="text-[11px] text-slate-500">Demo session</span>
+        </div>
+        <ul id="activity" class="space-y-2">
+          <li id="activity-empty" class="text-sm text-slate-500 bg-ink-900 border border-dashed border-white/10 rounded-2xl p-4 text-center">No payments yet</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 2: SCANNER ============ -->
+  <section id="screen-scan" class="screen hidden-screen pt-12 bg-black">
+    <div class="flex items-center justify-between px-5 py-3">
+      <button data-back class="w-10 h-10 rounded-full bg-white/10 grid place-items-center hover:bg-white/15" aria-label="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="text-center">
+        <div class="font-semibold">Scan to Pay</div>
+        <div class="text-[11px] text-slate-400">Thai QR Payment · PromptPay</div>
+      </div>
+      <div class="w-10"></div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto no-scrollbar px-5 pb-8">
+      <div class="relative mx-auto aspect-square w-full max-w-[320px] rounded-3xl overflow-hidden bg-ink-900 mt-2">
+        <div id="reader" class="absolute inset-0"></div>
+        <div id="cam-status" class="absolute inset-0 grid place-items-center text-center px-8 text-sm text-slate-400">
+          <div>
+            <div class="mx-auto w-10 h-10 rounded-full border-2 border-shift-400 border-t-transparent animate-spin mb-3"></div>
+            Starting camera…
+          </div>
+        </div>
+        <!-- Viewfinder corners -->
+        <div class="pointer-events-none absolute inset-6">
+          <div class="absolute left-0 top-0 w-10 h-10 border-l-4 border-t-4 border-shift-400 rounded-tl-xl"></div>
+          <div class="absolute right-0 top-0 w-10 h-10 border-r-4 border-t-4 border-shift-400 rounded-tr-xl"></div>
+          <div class="absolute left-0 bottom-0 w-10 h-10 border-l-4 border-b-4 border-shift-400 rounded-bl-xl"></div>
+          <div class="absolute right-0 bottom-0 w-10 h-10 border-r-4 border-b-4 border-shift-400 rounded-br-xl"></div>
+          <div class="scan-line absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-shift-400 to-transparent shadow-[0_0_12px_#f6c945]"></div>
+        </div>
+      </div>
+      <div id="scan-feedback" class="hidden mt-4 text-xs rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-200 p-3 break-all"></div>
+      <p class="text-center text-xs text-slate-400 mt-4">Hold the QR 20–30 cm from the camera, fill most of the frame, and turn the phone's brightness up</p>
+
+      <label class="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+        Upload QR image / screenshot
+        <input id="qr-file" type="file" accept="image/*" class="hidden" />
+      </label>
+      <div id="file-reader" class="hidden"></div>
+
+      <div class="mt-6 bg-ink-900 border border-white/10 rounded-2xl p-4">
+        <label for="fallback-input" class="block text-xs font-semibold text-amber-300 mb-2">Demo Fallback: Paste Raw EMVCo String here if camera is blocked</label>
+        <textarea id="fallback-input" rows="3" spellcheck="false" placeholder="00020101021229370016A000000677010111..." class="w-full resize-none rounded-xl bg-ink-950 border border-white/10 focus:border-shift-400 focus:ring-0 outline-none p-3 font-mono text-[11px] text-slate-200 placeholder:text-slate-600"></textarea>
+        <div id="parse-error" class="hidden mt-2 text-xs text-rose-400"></div>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <button id="btn-sample-amount" class="text-[11px] font-semibold rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 py-2">Sample: phone + ฿450</button>
+          <button id="btn-sample-open" class="text-[11px] font-semibold rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 py-2">Sample: Tax ID, no amount</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 3: COMPLIANCE & CONFIRM ============ -->
+  <section id="screen-confirm" class="screen hidden-screen pt-12">
+    <div class="flex items-center justify-between px-5 py-3">
+      <button data-back-scan class="w-10 h-10 rounded-full bg-white/10 grid place-items-center hover:bg-white/15" aria-label="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="font-semibold">Review Payment</div>
+      <div class="w-10"></div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto no-scrollbar px-5 pb-6">
+      <!-- Compliance notice -->
+      <div class="rounded-2xl border border-sky-400/30 bg-sky-500/10 p-4 flex gap-3">
+        <div class="shrink-0 w-8 h-8 rounded-full bg-sky-400/20 grid place-items-center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <div class="text-xs font-bold uppercase tracking-wider text-sky-300">Compliance Notice</div>
+          <p class="mt-1 text-[13px] leading-snug text-sky-100/90"><span class="font-semibold text-sky-100">Non-Custodial Route:</span> No fiat processed on-chain. Stablecoins are routed directly to licensed local exchange order books for instant merchant THB settlement.</p>
+        </div>
+      </div>
+
+      <!-- Merchant -->
+      <div class="mt-5 flex items-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-siam-red to-siam-blue grid place-items-center text-lg font-bold" id="merchant-avatar">M</div>
+        <div class="min-w-0">
+          <div class="text-xs text-slate-400">Paying to</div>
+          <div id="merchant-name" class="font-semibold truncate">PromptPay Merchant</div>
+        </div>
+        <span id="crc-badge" class="ml-auto text-[10px] font-semibold rounded-full px-2 py-1"></span>
+      </div>
+
+      <!-- Amount -->
+      <div class="mt-5 rounded-3xl bg-ink-800 border border-white/5 p-5 text-center">
+        <div class="text-xs text-slate-400 uppercase tracking-widest">Target Amount</div>
+        <div id="amount-fixed" class="mt-2 text-4xl font-extrabold tracking-tight"><span id="amount-thb-display">0.00</span> <span class="text-xl text-slate-400 font-bold">THB</span></div>
+        <div id="amount-input-wrap" class="hidden mt-2">
+          <div class="flex items-center justify-center gap-2">
+            <span class="text-3xl font-bold text-slate-500">฿</span>
+            <input id="amount-input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" class="w-44 bg-transparent text-4xl font-extrabold tracking-tight text-center outline-none border-b-2 border-white/10 focus:border-shift-400 placeholder:text-slate-700" />
+          </div>
+          <div class="text-[11px] text-amber-300/90 mt-2">No amount (Tag 54) in this QR — enter THB manually</div>
+        </div>
+        <div class="mt-3 text-sm text-slate-400">You pay <span id="usdt-hero" class="text-shift-400 font-semibold">0.00 USDT</span></div>
+      </div>
+
+      <!-- Details -->
+      <dl class="mt-5 rounded-2xl bg-ink-900 border border-white/5 divide-y divide-white/5 text-sm">
+        <div class="flex justify-between gap-4 px-4 py-3"><dt class="text-slate-400">Merchant Identifier</dt><dd class="text-right"><div id="merchant-id" class="font-mono font-medium">—</div><div id="merchant-id-type" class="text-[11px] text-slate-500"></div></dd></div>
+        <div class="flex justify-between gap-4 px-4 py-3"><dt class="text-slate-400">Target Amount</dt><dd id="detail-thb" class="font-medium">0.00 THB</dd></div>
+        <div class="flex justify-between gap-4 px-4 py-3"><dt class="text-slate-400">Live Oracle Rate</dt><dd class="font-medium flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span><span class="rate-text">1 USDT = 33.50 THB</span></dd></div>
+        <div class="flex justify-between gap-4 px-4 py-3"><dt class="text-slate-400">Network Gas Fee</dt><dd class="text-right"><div class="font-medium">$0.00</div><div class="text-[11px] text-emerald-400">Sponsored / Gasless abstraction</div></dd></div>
+        <div class="flex justify-between gap-4 px-4 py-3.5 bg-white/[.02] rounded-b-2xl"><dt class="font-semibold">Final Deductible Amount</dt><dd id="detail-usdt" class="font-bold text-shift-400">0.00 USDT</dd></div>
+      </dl>
+      <div id="sim-note" class="hidden mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 text-amber-200 text-xs p-3 leading-relaxed">Simulated payment: your real wallet balance is checked, but no USDT leaves your wallet and no transaction is signed.</div>
+      <div id="balance-warning" class="hidden mt-3 text-xs text-rose-400 text-center">Insufficient USDT balance for this payment</div>
+      <details class="mt-4 group">
+        <summary class="text-[11px] text-slate-500 cursor-pointer select-none">Show decoded EMVCo payload</summary>
+        <pre id="raw-tlv" class="mt-2 text-[10px] font-mono text-slate-400 bg-ink-900 rounded-xl p-3 whitespace-pre-wrap break-all"></pre>
+      </details>
+    </div>
+
+    <!-- Slide to pay -->
+    <div class="px-5 pb-8 pt-3 border-t border-white/5 bg-ink-950">
+      <div id="slider" class="slider-track relative h-16 rounded-full bg-ink-800 border border-white/10 overflow-hidden">
+        <div id="slider-fill" class="absolute inset-y-0 left-0 bg-gradient-to-r from-shift-600 to-amber-200 opacity-40" style="width:0"></div>
+        <div id="slider-label" class="absolute inset-0 grid place-items-center text-sm font-semibold text-slate-300 pointer-events-none">Slide to Pay  →</div>
+        <div id="slider-knob" class="absolute top-1.5 left-1.5 w-[52px] h-[52px] rounded-full bg-gradient-to-br from-amber-200 to-shift-400 grid place-items-center text-ink-950 shadow-lg cursor-grab active:cursor-grabbing">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+      <button id="btn-confirm" class="mt-2 w-full text-xs text-slate-500 hover:text-slate-300 py-1">or tap to Confirm Payment</button>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN 4: SUCCESS ============ -->
+  <section id="screen-success" class="screen hidden-screen bg-gradient-to-b from-emerald-400 via-emerald-500 to-teal-600 text-ink-950 pt-12">
+    <div class="flex-1 overflow-y-auto no-scrollbar px-6 pb-8 flex flex-col">
+      <div class="flex-1 flex flex-col items-center justify-center text-center pt-6">
+        <div class="pop w-24 h-24 rounded-full bg-white grid place-items-center shadow-2xl shadow-emerald-900/40">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <h2 class="mt-6 text-3xl font-extrabold tracking-tight">Payment Successful</h2>
+        <div class="mt-2 text-5xl font-extrabold tracking-tight"><span id="success-thb">0.00</span><span class="text-2xl"> THB</span></div>
+        <div class="mt-1 text-sm font-semibold text-ink-950/70">Settled from <span id="success-usdt">0.00</span> USDT</div>
+        <div id="success-sim" class="hidden mt-3 text-xs font-semibold bg-ink-950/15 rounded-full px-3 py-1">Simulation · no funds left your wallet</div>
+      </div>
+
+      <div class="mt-8 bg-white/90 backdrop-blur rounded-3xl p-5 pt-6 text-sm shadow-xl shadow-emerald-900/20 relative overflow-hidden">
+        <div class="flag-stripe-h absolute top-0 inset-x-0 h-1.5"></div>
+        <div class="flex items-center justify-between pb-3 border-b border-dashed border-slate-300">
+          <span class="font-bold">Receipt</span>
+          <span id="success-time" class="text-xs text-slate-500"></span>
+        </div>
+        <dl class="mt-3 space-y-2.5">
+          <div class="flex justify-between gap-3"><dt class="text-slate-500">Destination merchant</dt><dd id="success-merchant" class="font-semibold text-right">—</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-slate-500">Rate</dt><dd class="font-semibold rate-text">1 USDT = 33.50 THB</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-slate-500">Gas fee</dt><dd class="font-semibold">$0.00 (sponsored)</dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-slate-500">Rail</dt><dd class="font-semibold">PromptPay</dd></div>
+          <div class="pt-2">
+            <dt class="text-slate-500">Transaction hash <span class="text-[10px]">(simulated)</span></dt>
+            <dd class="mt-1 flex items-center gap-2">
+              <code id="success-hash" class="font-mono text-[11px] break-all bg-slate-100 rounded-lg px-2 py-1.5 flex-1"></code>
+              <button id="btn-copy-hash" class="shrink-0 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900">Copy</button>
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <button id="btn-back-wallet" class="mt-6 w-full rounded-2xl py-4 font-bold bg-ink-950 text-white hover:bg-ink-900 active:scale-[.98] transition">Back to Wallet</button>
+    </div>
+  </section>
+
+  <!-- ============ OVERLAY: WALLET MODAL ============ -->
+  <div id="wallet-modal" class="hidden absolute inset-0 z-50">
+    <div data-close-modal class="absolute inset-0 bg-black/60 backdrop-blur-sm fade-in"></div>
+    <div class="sheet-in absolute bottom-0 inset-x-0 h-[88%] flex flex-col bg-ink-900 rounded-t-[2rem] border-t border-white/10 pt-5">
+      <div class="px-5">
+        <div class="mx-auto w-10 h-1.5 rounded-full bg-white/15 mb-4"></div>
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-bold">Select a wallet</h3>
+          <button data-close-modal class="w-8 h-8 rounded-full bg-white/5 grid place-items-center hover:bg-white/10" aria-label="Close">✕</button>
+        </div>
+        <p class="text-xs text-slate-400 mb-3">Switch Wallet never holds your keys or funds.</p>
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="wallet-search" type="search" placeholder="Search wallets" autocomplete="off" class="w-full rounded-xl bg-ink-950 border border-white/10 focus:border-shift-400 outline-none py-2.5 pl-9 pr-3 text-sm" />
+        </div>
+      </div>
+
+      <div id="wallet-options" class="flex-1 overflow-y-auto no-scrollbar px-5 pt-4 pb-8">
+        <div id="detected-wrap" class="hidden mb-5">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-emerald-300 mb-2">Detected in this browser</div>
+          <div id="wallets-detected" class="space-y-2"></div>
+        </div>
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">All wallets</div>
+        <div id="wallets-all" class="space-y-2"></div>
+        <div id="wallets-empty" class="hidden text-sm text-slate-500 text-center py-6">No wallet matches your search.</div>
+        <button id="btn-more-wallets" class="mt-3 w-full rounded-2xl py-3 text-sm font-semibold bg-white/5 hover:bg-white/10 border border-white/10">Don't see yours? Search 500+ wallets</button>
+        <button id="btn-demo-wallet" class="mt-2 w-full rounded-2xl py-3 text-sm font-semibold text-slate-400 hover:bg-white/5">Use demo wallet (250 test USDT)</button>
+      </div>
+
+      <!-- Shown when a phone wallet is picked but no Project ID is set yet -->
+      <div id="wallet-needs-setup" class="hidden flex-1 px-5 pt-6 text-center">
+        <div id="needs-icon" class="mx-auto w-16 h-16 rounded-2xl grid place-items-center text-2xl font-bold"></div>
+        <div class="mt-4 font-bold text-lg"><span id="needs-name"></span> connects over WalletConnect</div>
+        <p class="text-sm text-slate-400 mt-2 leading-relaxed">To connect <span id="needs-name-2"></span>, add a Privy App ID (or a Reown Project ID) in Settings. You only do this once. After that, tapping it opens the connect window right away.</p>
+        <button id="btn-open-setup" class="mt-5 w-full rounded-xl py-3 font-semibold bg-shift-400 text-ink-950 hover:bg-shift-500">Add App ID in Settings</button>
+        <button id="btn-needs-demo" class="mt-2 w-full rounded-xl py-3 text-sm font-semibold bg-white/5 hover:bg-white/10 border border-white/10">Continue in demo mode</button>
+        <button id="btn-needs-back" class="mt-2 w-full rounded-xl py-3 text-sm font-semibold text-slate-400 hover:bg-white/5">← Back to wallets</button>
+      </div>
+
+      <div id="wallet-connecting" class="hidden flex-1 py-10 text-center px-5">
+        <div class="mx-auto w-12 h-12 rounded-full border-[3px] border-shift-400 border-t-transparent animate-spin"></div>
+        <div class="mt-4 font-semibold">Connecting to <span id="wallet-connecting-name"></span>…</div>
+        <div class="text-xs text-slate-400 mt-1">Approve the request in your wallet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ OVERLAY: SETTINGS ============ -->
+  <div id="settings" class="hidden absolute inset-0 z-50">
+    <div data-close-settings class="absolute inset-0 bg-black/60 backdrop-blur-sm fade-in"></div>
+    <div class="sheet-in absolute bottom-0 inset-x-0 max-h-[92%] overflow-y-auto no-scrollbar bg-ink-900 rounded-t-[2rem] border-t border-white/10 p-5 pb-8">
+      <div class="mx-auto w-10 h-1.5 rounded-full bg-white/15 mb-4"></div>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold">Settings</h3>
+        <button data-close-settings class="w-8 h-8 rounded-full bg-white/5 grid place-items-center hover:bg-white/10" aria-label="Close">✕</button>
+      </div>
+      <label for="set-privy" class="block text-xs font-semibold text-slate-300">Privy App ID <span class="text-emerald-300 font-normal">(recommended)</span></label>
+      <input id="set-privy" type="text" spellcheck="false" autocomplete="off" placeholder="e.g. cm1abc2def3…" class="mt-1.5 w-full rounded-xl bg-ink-950 border border-white/10 focus:border-shift-400 outline-none p-3 font-mono text-xs" />
+      <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">Free at <span class="text-slate-200 select-all">dashboard.privy.io</span>: create an app and copy its App ID. In the app’s settings, add <span class="text-slate-200 select-all set-origin-copy"></span> to Allowed origins.</p>
+      <div class="my-5 flex items-center gap-3 text-[10px] uppercase tracking-wider text-slate-600"><span class="flex-1 h-px bg-white/10"></span>or<span class="flex-1 h-px bg-white/10"></span></div>
+      <label for="set-project" class="block text-xs font-semibold text-slate-300">Reown (WalletConnect) Project ID</label>
+      <input id="set-project" type="text" spellcheck="false" autocomplete="off" placeholder="32 characters, e.g. 3f2a9c…" class="mt-1.5 w-full rounded-xl bg-ink-950 border border-white/10 focus:border-shift-400 outline-none p-3 font-mono text-xs" />
+      <ol class="text-[11px] text-slate-400 mt-2 leading-relaxed list-decimal pl-4 space-y-0.5">
+        <li>Sign up free at <span class="text-slate-200 select-all">cloud.reown.com</span> and create a project (type: AppKit).</li>
+        <li>Copy its Project ID into the box above.</li>
+        <li>In the project's domain settings, allow <span class="text-slate-200 select-all" id="set-origin"></span>.</li>
+      </ol>
+      <div id="set-error" class="hidden mt-3 text-xs text-rose-400"></div>
+      <button id="btn-save-settings" class="mt-5 w-full rounded-xl py-3 font-semibold bg-shift-400 text-ink-950 hover:bg-shift-500">Save</button>
+      <details class="mt-5">
+        <summary class="text-[11px] text-slate-500 cursor-pointer select-none">Supported networks and USDT contracts</summary>
+        <ul id="set-networks" class="mt-2 space-y-1.5 text-[10px] font-mono text-slate-400 break-all"></ul>
+      </details>
+    </div>
+  </div>
+
+  <!-- ============ OVERLAY: PROCESSING ============ -->
+  <div id="processing" class="hidden absolute inset-0 z-50 bg-ink-950/95 backdrop-blur-md grid place-items-center px-8">
+    <div class="w-full fade-in">
+      <div class="mx-auto w-20 h-20 relative">
+        <div class="absolute inset-0 rounded-full border-4 border-white/5"></div>
+        <div class="absolute inset-0 rounded-full border-4 border-shift-400 border-t-transparent animate-spin"></div>
+        <div class="absolute inset-0 grid place-items-center text-2xl font-extrabold text-shift-400">฿</div>
+      </div>
+      <h3 id="processing-title" class="text-center mt-6 text-lg font-bold">Settling payment</h3>
+      <ol id="steps" class="mt-6 space-y-3"></ol>
+    </div>
+  </div>
+
+  <!-- ============ OVERLAY: ALERT ============ -->
+  <div id="alert" class="hidden absolute inset-0 z-[60] grid place-items-center px-8">
+    <div data-close-alert class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+    <div class="pop relative w-full bg-ink-800 border border-white/10 rounded-3xl p-6 text-center">
+      <div class="mx-auto w-12 h-12 rounded-full bg-amber-400/15 grid place-items-center text-2xl">⚠️</div>
+      <h4 id="alert-title" class="mt-3 font-bold text-lg">Wallet not connected</h4>
+      <p id="alert-body" class="mt-1 text-sm text-slate-400">Connect a wallet before confirming this payment.</p>
+      <div class="mt-5 grid gap-2">
+        <button id="alert-primary" class="rounded-xl py-3 font-semibold bg-shift-400 text-ink-950 hover:bg-shift-500">Connect Wallet</button>
+        <button data-close-alert class="rounded-xl py-3 font-semibold text-slate-300 hover:bg-white/5">Dismiss</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="hidden absolute top-14 left-1/2 -translate-x-1/2 z-[70] bg-white text-ink-950 text-xs font-semibold rounded-full px-4 py-2 shadow-xl fade-in"></div>
+</div>
+
+<script type="module">
+(() => {
+  // ---------- Constants & state ----------
+  const FALLBACK_RATE = 33.50;     // used only if the live USDT/THB rate can't be fetched
+  const DEMO_BALANCE = 250.00;
+  const APPKIT_URL = 'https://cdn.jsdelivr.net/npm/@reown/appkit-cdn@1.8.24/dist/appkit.js';
+
+  // Official Tether (USDT) contracts on each supported EVM network (read-only balance lookups)
+  const USDT = {
+    1:     { name: 'Ethereum',  key: 'mainnet',  address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6 },
+    137:   { name: 'Polygon',   key: 'polygon',  address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', decimals: 6 },
+    56:    { name: 'BNB Chain', key: 'bsc',      address: '0x55d398326f99059fF775485246999027B3197955', decimals: 18 },
+    42161: { name: 'Arbitrum',  key: 'arbitrum', address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', decimals: 6 },
+    10:    { name: 'Optimism',  key: 'optimism', address: '0x94b008aA00579c1307B0EF2c499aD98a61f58e58', decimals: 6 },
+  };
+  const BALANCE_ABI = [{ type: 'function', name: 'balanceOf', stateMutability: 'view', inputs: [{ name: 'owner', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] }];
+
+  const state = {
+    mode: null,                    // 'live' (real wallet, read-only) | 'demo' | null (disconnected)
+    wallet: null,                  // { name, address, chainId }
+    balance: 0,
+    rate: FALLBACK_RATE,
+    rateLive: false,
+    payment: null,                 // parsed QR + amounts
+    scanner: null,
+    scanning: false,
+    settings: loadSettings(),      // { projectId }
+    kit: null,                     // { modal, config, core, viem } once the wallet library loads
+    injected: null,                // { provider, name } when connected straight to a browser extension
+    privyWallet: null,             // Privy ConnectedWallet (e.g. Edge over WalletConnect)
+    pendingWallet: null,           // phone wallet picked before a Project ID was set
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const shortAddr = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+
+  function loadSettings() {
+    try { return JSON.parse(localStorage.getItem('sw-settings')) || {}; } catch (_) { return {}; }
+  }
+  function storeSettings(v) {
+    try { localStorage.setItem('sw-settings', JSON.stringify(v)); } catch (_) {}
+  }
+
+  // ---------- Navigation ----------
+  const screens = ['home', 'scan', 'confirm', 'success'];
+  function show(name) {
+    screens.forEach((s) => $('screen-' + s).classList.toggle('hidden-screen', s !== name));
+    if (name === 'scan') startScanner(); else stopScanner();
+  }
+
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.remove('hidden');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.add('hidden'), 1800);
+  }
+
+  // Live clock in status bar
+  const tick = () => { $('clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M/i, ''); };
+  tick(); setInterval(tick, 30000);
+
+  // ---------- Live USDT/THB rate ----------
+  async function refreshRate() {
+    try {
+      const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=thb');
+      const thb = (await r.json())?.tether?.thb;
+      if (thb > 0) { state.rate = thb; state.rateLive = true; }
+    } catch (_) {
+      state.rateLive = false;
+    }
+    const txt = `1 USDT = ${state.rate.toFixed(2)} THB` + (state.rateLive ? '' : ' (fallback)');
+    document.querySelectorAll('.rate-text').forEach((el) => { el.textContent = txt; });
+    renderWallet();
+    updateAmounts();
+  }
+
+  // ---------- Wallet ----------
+  function randomHex(n) {
+    const bytes = new Uint8Array(Math.ceil(n / 2));
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, n);
+  }
+
+  function openWalletModal() {
+    $('wallet-search').value = '';
+    showSheetView('wallet-options');
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    renderWalletList();
+    $('wallet-options').scrollTop = 0;
+    $('wallet-modal').classList.remove('hidden');
+  }
+  function closeWalletModal() { $('wallet-modal').classList.add('hidden'); }
+
+  // Reown AppKit discovers every wallet extension in this browser (EIP-6963)
+  // and lists 500+ phone wallets (Edge, Trust, Rainbow, …) over WalletConnect.
+  async function initWalletKit() {
+    if (state.kit || !state.settings.projectId) return state.kit;
+    const m = await import(APPKIT_URL);
+    const networks = Object.values(USDT).map((n) => m.networks[n.key]);
+    const adapter = new m.WagmiAdapter({ projectId: state.settings.projectId, networks });
+    const modal = m.createAppKit({
+      adapters: [adapter],
+      networks,
+      projectId: state.settings.projectId,
+      metadata: { name: 'Switch Wallet', description: 'Pay PromptPay QR codes with USDT', url: location.origin, icons: [] },
+      features: { analytics: false, email: false, socials: false, swaps: false, onramp: false, send: false },
+      themeMode: 'dark',
+      themeVariables: { '--w3m-accent': '#f6c945', '--w3m-z-index': 1000 },
+    });
+    state.kit = { modal, config: adapter.wagmiConfig, core: m.WagmiCore, viem: m.Viem };
+    m.WagmiCore.watchAccount(state.kit.config, { onChange: onAccountChange });
+    onAccountChange(m.WagmiCore.getAccount(state.kit.config));
+    return state.kit;
+  }
+
+  function openConnect() {
+    openWalletModal();
+  }
+
+  function onAccountChange(acc) {
+    if (state.injected || state.privyWallet) return;
+    if (acc.isConnected && acc.address) {
+      const previous = state.wallet?.address;
+      state.mode = 'live';
+      state.wallet = { name: acc.connector?.name || 'Wallet', address: acc.address, chainId: acc.chainId };
+      if (previous !== acc.address) toast(state.wallet.name + ' connected');
+      refreshBalance();
+    } else if (state.mode === 'live') {
+      state.mode = null;
+      state.wallet = null;
+      state.balance = 0;
+    }
+    renderWallet();
+    updateAmounts();
+  }
+
+  async function refreshBalance() {
+    const w = state.wallet;
+    if (state.mode !== 'live' || !w) return;
+    const net = USDT[w.chainId];
+    if (!net) { state.balance = 0; renderWallet(); return; }
+    try {
+      if (state.privyWallet) {
+        state.balance = await rpcUsdtBalance(net, w.chainId, w.address);
+      } else if (state.injected) {
+        state.balance = await injectedUsdtBalance(net, w.address);
+      } else {
+        const raw = await state.kit.core.readContract(state.kit.config, {
+          address: net.address, abi: BALANCE_ABI, functionName: 'balanceOf', args: [w.address], chainId: w.chainId,
+        });
+        state.balance = Number(state.kit.viem.formatUnits(raw, net.decimals));
+      }
+    } catch (e) {
+      console.warn('USDT balance read failed', e);
+    }
+    renderWallet();
+    updateAmounts();
+  }
+
+  function connectDemo(name = 'Demo wallet') {
+    showSheetView('wallet-connecting');
+    $('wallet-connecting-name').textContent = name;
+    setTimeout(() => {
+      state.mode = 'demo';
+      state.wallet = { name: name === 'Demo wallet' ? name : name + ' (demo)', address: '0x71C7656EC7ab88b098defB751B7401B5f6d83A9f', chainId: null };
+      state.balance = DEMO_BALANCE;
+      closeWalletModal();
+      renderWallet();
+      toast(state.wallet.name + ' connected');
+    }, 900);
+  }
+
+  function disconnectDemo() {
+    state.mode = null;
+    state.wallet = null;
+    state.balance = 0;
+    renderWallet();
+    toast('Wallet disconnected');
+  }
+
+  function renderWallet() {
+    const w = state.wallet;
+    const btn = $('btn-connect');
+    $('wallet-badge').classList.toggle('hidden', !w);
+    $('wallet-badge').classList.toggle('flex', !!w);
+    if (w) {
+      const short = shortAddr(w.address);
+      const net = USDT[w.chainId];
+      $('wallet-badge-addr').textContent = short;
+      $('wallet-name').textContent = w.name;
+      $('network-chip').textContent = state.mode === 'demo' ? 'Demo' : net ? net.name : '⚠ Unsupported network';
+      const action = state.mode === 'demo' || state.injected || state.privyWallet ? 'disconnect' : 'manage';
+      btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> ${state.mode === 'demo' ? 'Demo wallet' : 'Connected'} · <span class="font-mono">${short}</span> <span class="ml-1 text-xs text-slate-500">(${action})</span>`;
+      btn.className = 'mt-3 w-full flex items-center justify-center gap-2 rounded-2xl py-4 font-semibold bg-ink-800 border border-emerald-400/30 text-emerald-300 hover:bg-ink-700 active:scale-[.98] transition text-sm';
+    } else {
+      $('wallet-name').textContent = 'Not connected';
+      $('network-chip').textContent = state.settings.projectId ? 'Real wallets ready' : 'Demo';
+      btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg> Connect Wallet`;
+      btn.className = 'mt-3 w-full flex items-center justify-center gap-2 rounded-2xl py-4 font-semibold bg-white text-ink-950 hover:bg-slate-100 active:scale-[.98] transition';
+    }
+    $('balance').textContent = fmt(state.balance);
+    $('balance-thb').textContent = fmt(state.balance * state.rate);
+  }
+
+  // ---------- Wallet list ----------
+  // Popular wallets. `rdns` matches browser extensions announced via EIP-6963; phone-only
+  // wallets (no rdns) connect over WalletConnect, which needs a Reown Project ID.
+  const WALLETS = [
+    { name: 'MetaMask', color: '#f6851b', rdns: 'io.metamask' },
+    { name: 'Trust Wallet', color: '#3375bb', rdns: 'com.trustwallet.app' },
+    { name: 'Edge', color: '#0c2550', phone: true },
+    { name: 'Coinbase Wallet', color: '#0052ff', rdns: 'com.coinbase.wallet' },
+    { name: 'Phantom', color: '#ab9ff2', rdns: 'app.phantom' },
+    { name: 'Rainbow', color: '#ff6a3d', rdns: 'me.rainbow' },
+    { name: 'OKX Wallet', color: '#111111', rdns: 'com.okex.wallet' },
+    { name: 'Binance Wallet', color: '#f0b90b', rdns: 'com.binance.wallet' },
+    { name: 'Rabby', color: '#7084ff', rdns: 'io.rabby' },
+    { name: 'Ledger Live', color: '#222222', phone: true },
+    { name: 'Exodus', color: '#8b5cf6', rdns: 'com.exodus.web3-wallet' },
+    { name: 'Zerion', color: '#2962ef', rdns: 'io.zerion.wallet' },
+    { name: 'Uniswap Wallet', color: '#ff007a', phone: true },
+    { name: 'Bitget Wallet', color: '#00f0ff', rdns: 'com.bitget.web3' },
+    { name: 'SafePal', color: '#4a21ef', rdns: 'com.safepal' },
+    { name: 'TokenPocket', color: '#2980fe', rdns: 'pro.tokenpocket' },
+    { name: 'imToken', color: '#11c4d1', phone: true },
+    { name: 'Crypto.com Onchain', color: '#103f68', rdns: 'com.crypto.wallet' },
+    { name: '1inch Wallet', color: '#1b314f', phone: true },
+    { name: 'Argent', color: '#ff875b', phone: true },
+    { name: 'Safe', color: '#12ff80', phone: true },
+    { name: 'Zengo', color: '#00c389', phone: true },
+    { name: 'Atomic Wallet', color: '#1f8efa', phone: true },
+    { name: 'Coin98', color: '#d9b432', rdns: 'coin98.com' },
+    { name: 'Bybit Wallet', color: '#f7a600', rdns: 'com.bybit' },
+    { name: 'Kraken Wallet', color: '#7132f5', phone: true },
+    { name: 'Brave Wallet', color: '#fb542b', rdns: 'com.brave.wallet' },
+    { name: 'Frame', color: '#1a1a2e', rdns: 'sh.frame' },
+    { name: 'Taho', color: '#d08e39', rdns: 'xyz.taho' },
+    { name: 'Enkrypt', color: '#a34ce5', rdns: 'com.enkrypt' },
+    { name: 'Core', color: '#e84142', rdns: 'app.core.extension' },
+    { name: 'MathWallet', color: '#000000', phone: true },
+    { name: 'Tangem', color: '#1e1e1e', phone: true },
+    { name: 'Best Wallet', color: '#ff5a1f', phone: true },
+    { name: 'Blockchain.com', color: '#121d33', phone: true },
+    { name: 'Robinhood Wallet', color: '#00c805', phone: true },
+    { name: 'BitPay', color: '#1a3b8b', phone: true },
+    { name: 'Guarda', color: '#3b3bff', phone: true },
+    { name: 'Ambire', color: '#6000ff', rdns: 'com.ambire' },
+    { name: 'Klever', color: '#dc3f89', phone: true },
+  ];
+
+  // EIP-6963: every installed extension wallet announces itself with a name and icon
+  const detected = new Map(); // uuid -> { info, provider }
+  window.addEventListener('eip6963:announceProvider', (e) => {
+    detected.set(e.detail.info.uuid, e.detail);
+    if (!$('wallet-modal').classList.contains('hidden')) renderWalletList();
+  });
+  window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+  function detectedList() {
+    const list = [...detected.values()];
+    // Older extensions only expose window.ethereum
+    if (!list.length && window.ethereum) list.push({ info: { uuid: 'legacy', name: window.ethereum.isMetaMask ? 'MetaMask' : 'Browser wallet', icon: '', rdns: '' }, provider: window.ethereum });
+    return list;
+  }
+
+  function walletIcon(entry, size = 'w-10 h-10') {
+    const el = document.createElement('span');
+    el.className = `${size} rounded-xl grid place-items-center text-sm font-bold text-white shrink-0 overflow-hidden`;
+    if (entry.icon) {
+      const img = document.createElement('img');
+      img.src = entry.icon; img.alt = ''; img.className = 'w-full h-full object-cover';
+      el.appendChild(img);
+    } else {
+      el.style.background = entry.color || '#334155';
+      el.textContent = entry.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase();
+    }
+    return el;
+  }
+
+  function walletRow(entry, tag, onClick) {
+    const b = document.createElement('button');
+    b.className = 'w-full flex items-center gap-3 p-3 rounded-2xl bg-ink-800 hover:bg-ink-700 border border-white/5 transition text-left';
+    b.appendChild(walletIcon(entry));
+    const name = document.createElement('span');
+    name.className = 'font-semibold flex-1 truncate';
+    name.textContent = entry.name;
+    b.appendChild(name);
+    if (tag) {
+      const t = document.createElement('span');
+      t.className = 'text-[10px] font-semibold rounded-full px-2 py-0.5 ' + tag.cls;
+      t.textContent = tag.text;
+      b.appendChild(t);
+    }
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function renderWalletList() {
+    const q = $('wallet-search').value.trim().toLowerCase();
+    const match = (n) => !q || n.toLowerCase().includes(q);
+    const found = detectedList();
+    const foundRdns = new Set(found.map((d) => d.info.rdns));
+
+    const det = $('wallets-detected');
+    det.replaceChildren(...found.filter((d) => match(d.info.name)).map((d) =>
+      walletRow({ name: d.info.name, icon: d.info.icon }, { text: 'Installed', cls: 'bg-emerald-400/10 text-emerald-300' }, () => connectInjected(d))));
+    $('detected-wrap').classList.toggle('hidden', !det.children.length);
+
+    const all = $('wallets-all');
+    all.replaceChildren(...WALLETS.filter((w) => match(w.name) && !foundRdns.has(w.rdns)).map((w) =>
+      walletRow(w, w.phone ? { text: 'Phone', cls: 'bg-sky-400/10 text-sky-300' } : null, () => pickWallet(w))));
+    $('wallets-empty').classList.toggle('hidden', !!(det.children.length || all.children.length));
+  }
+
+  function showSheetView(view) {
+    ['wallet-options', 'wallet-needs-setup', 'wallet-connecting'].forEach((id) => $(id).classList.toggle('hidden', id !== view));
+    $('wallet-search').parentElement.classList.toggle('hidden', view !== 'wallet-options');
+  }
+
+  // A wallet from the catalog that isn't installed here: connect via WalletConnect QR
+  async function pickWallet(w) {
+    if (state.settings.privyAppId) return connectWithPrivy(w);
+    if (!state.settings.projectId) {
+      state.pendingWallet = w;
+      const icon = $('needs-icon');
+      icon.replaceWith(Object.assign(walletIcon(w, 'w-16 h-16'), { id: 'needs-icon' }));
+      $('needs-icon').classList.add('mx-auto');
+      $('needs-name').textContent = w.name;
+      $('needs-name-2').textContent = w.name;
+      return showSheetView('wallet-needs-setup');
+    }
+    closeWalletModal();
+    try {
+      const kit = await initWalletKit();
+      toast(`Scan the QR code with ${w.name}`);
+      // Generic WalletConnect QR: any WalletConnect wallet (Edge included) can scan it
+      try { await kit.modal.open({ view: 'ConnectingWalletConnectBasic' }); }
+      catch (_) { await kit.modal.open({ view: 'AllWallets' }); }
+    } catch (e) {
+      console.error(e);
+      showAlert({ title: 'Wallet library failed to load', body: 'Check your internet connection and the Project ID in Settings.', primary: 'Open Settings', onPrimary: openSettings });
+    }
+  }
+
+  async function openAllWallets() {
+    if (state.settings.privyAppId) return connectWithPrivy({ name: 'your wallet' });
+    if (!state.settings.projectId) return pickWallet({ name: 'Your wallet', color: '#334155' });
+    closeWalletModal();
+    try { (await initWalletKit()).modal.open({ view: 'AllWallets' }); }
+    catch (e) { console.error(e); }
+  }
+
+  // Direct connection to an installed extension (read-only: accounts, network, balance)
+  async function connectInjected(d) {
+    showSheetView('wallet-connecting');
+    $('wallet-connecting-name').textContent = d.info.name;
+    try {
+      const provider = d.provider;
+      const [address] = await provider.request({ method: 'eth_requestAccounts' });
+      const chainId = parseInt(await provider.request({ method: 'eth_chainId' }), 16);
+      if (state.injected?.provider && state.injected.provider !== provider) detachInjected();
+      state.injected = { provider, name: d.info.name };
+      provider.on?.('accountsChanged', onInjectedAccounts);
+      provider.on?.('chainChanged', onInjectedChain);
+      state.mode = 'live';
+      state.wallet = { name: d.info.name, address, chainId };
+      closeWalletModal();
+      toast(d.info.name + ' connected');
+      renderWallet();
+      refreshBalance();
+    } catch (e) {
+      showSheetView('wallet-options');
+      toast(e?.code === 4001 ? 'Connection request declined' : 'Could not connect to ' + d.info.name);
+    }
+  }
+  function onInjectedAccounts(accounts) {
+    if (!accounts?.length) return disconnectInjected();
+    state.wallet.address = accounts[0];
+    renderWallet(); refreshBalance();
+  }
+  function onInjectedChain(hex) {
+    state.wallet.chainId = parseInt(hex, 16);
+    renderWallet(); refreshBalance();
+  }
+  function detachInjected() {
+    const p = state.injected?.provider;
+    p?.removeListener?.('accountsChanged', onInjectedAccounts);
+    p?.removeListener?.('chainChanged', onInjectedChain);
+    state.injected = null;
+  }
+  function disconnectInjected() {
+    detachInjected();
+    state.mode = null; state.wallet = null; state.balance = 0;
+    renderWallet(); updateAmounts();
+    toast('Wallet disconnected');
+  }
+
+  // balanceOf(address) via a plain eth_call on the extension's own RPC
+  async function injectedUsdtBalance(net, address) {
+    const data = '0x70a08231' + address.toLowerCase().replace(/^0x/, '').padStart(64, '0');
+    const hex = await state.injected.provider.request({ method: 'eth_call', params: [{ to: net.address, data }, 'latest'] });
+    const raw = BigInt(hex && hex !== '0x' ? hex : '0x0');
+    const base = 10n ** BigInt(net.decimals);
+    return Number(raw / base) + Number(raw % base) / Number(base);
+  }
+
+  // ---------- Privy wallet login ----------
+  // Privy runs WalletConnect for us, so phone wallets like Edge connect with just a Privy App ID.
+  const PRIVY_URL = 'https://esm.sh/@privy-io/react-auth@3.45.0?deps=react@19.1.0,react-dom@19.1.0';
+  const REACT_URL = 'https://esm.sh/react@19.1.0';
+  const REACT_DOM_URL = 'https://esm.sh/react-dom@19.1.0/client?deps=react@19.1.0';
+  const VIEM_CHAINS_URL = 'https://esm.sh/viem@2.38.0/chains';
+  // Public RPCs for read-only USDT balance lookups (phone wallets aren't asked to do eth_call)
+  const PUBLIC_RPC = {
+    1: 'https://ethereum-rpc.publicnode.com',
+    137: 'https://polygon-bor-rpc.publicnode.com',
+    56: 'https://bsc-rpc.publicnode.com',
+    42161: 'https://arbitrum-one-rpc.publicnode.com',
+    10: 'https://optimism-rpc.publicnode.com',
+  };
+
+  let privyReady = null;
+  function initPrivy() {
+    if (privyReady) return privyReady;
+    privyReady = (async () => {
+      const [React, ReactDOM, Privy, chains] = await Promise.all([import(REACT_URL), import(REACT_DOM_URL), import(PRIVY_URL), import(VIEM_CHAINS_URL)]);
+      const h = React.createElement;
+      let resolveApi;
+      const api = new Promise((r) => { resolveApi = r; });
+
+      // Invisible component that hands Privy's hooks to the rest of the app
+      function Bridge() {
+        const { ready } = Privy.usePrivy();
+        const { connectWallet } = Privy.useConnectWallet({
+          onError: (err) => { if (err && err !== 'exited_auth_flow') toast('Wallet connection failed'); },
+        });
+        const { wallets } = Privy.useWallets();
+        React.useEffect(() => { if (ready) resolveApi({ connectWallet }); }, [ready, connectWallet]);
+        React.useEffect(() => { onPrivyWallets(wallets); }, [wallets]);
+        return null;
+      }
+
+      const mount = document.createElement('div');
+      mount.id = 'privy-root';
+      document.body.appendChild(mount);
+      ReactDOM.createRoot(mount).render(
+        h(Privy.PrivyProvider, {
+          appId: state.settings.privyAppId,
+          config: {
+            appearance: { theme: 'dark', accentColor: '#f6c945', walletChainType: 'ethereum-only', walletList: ['detected_wallets', 'wallet_connect', 'metamask', 'coinbase_wallet', 'rainbow'] },
+            embeddedWallets: { ethereum: { createOnLogin: 'off' } },
+            defaultChain: chains.polygon,
+            supportedChains: [chains.mainnet, chains.polygon, chains.bsc, chains.arbitrum, chains.optimism],
+          },
+        }, h(Bridge)),
+      );
+      return api;
+    })();
+    privyReady.catch(() => { privyReady = null; });
+    return privyReady;
+  }
+
+  async function connectWithPrivy(w) {
+    closeWalletModal();
+    toast(`Opening wallet connect for ${w.name}…`);
+    try {
+      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('Privy did not become ready')), 25000));
+      const { connectWallet } = await Promise.race([initPrivy(), timeout]);
+      // Phone wallets go straight to the WalletConnect QR, which Edge scans
+      connectWallet(w.phone ? { walletList: ['wallet_connect'] } : undefined);
+    } catch (e) {
+      console.error(e);
+      showAlert({ title: 'Privy failed to load', body: 'Check your internet connection and the Privy App ID in Settings. In the Privy dashboard, also allow ' + location.origin + '.', primary: 'Open Settings', onPrimary: openSettings });
+    }
+  }
+
+  function onPrivyWallets(wallets) {
+    const ext = (wallets || []).find((x) => x.walletClientType !== 'privy' && x.walletClientType !== 'privy-v2');
+    if (ext) {
+      const chainId = parseInt(String(ext.chainId || '').split(':').pop(), 10) || null;
+      const name = ext.meta?.name || ext.walletClientType || 'Wallet';
+      const isNew = state.privyWallet?.address !== ext.address;
+      if (state.injected) detachInjected();
+      state.privyWallet = ext;
+      state.mode = 'live';
+      state.wallet = { name, address: ext.address, chainId };
+      if (isNew) toast(name + ' connected');
+      renderWallet();
+      refreshBalance();
+    } else if (state.privyWallet) {
+      state.privyWallet = null;
+      if (state.mode === 'live' && !state.injected) { state.mode = null; state.wallet = null; state.balance = 0; }
+      renderWallet();
+      updateAmounts();
+    }
+  }
+
+  async function disconnectPrivy() {
+    try { await state.privyWallet?.disconnect(); } catch (_) {}
+    state.privyWallet = null;
+    state.mode = null; state.wallet = null; state.balance = 0;
+    renderWallet(); updateAmounts();
+    toast('Wallet disconnected');
+  }
+
+  // balanceOf(address) over a public RPC (read-only)
+  async function rpcUsdtBalance(net, chainId, address) {
+    const data = '0x70a08231' + address.toLowerCase().replace(/^0x/, '').padStart(64, '0');
+    const r = await fetch(PUBLIC_RPC[chainId], {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: net.address, data }, 'latest'] }),
+    });
+    const hex = (await r.json()).result;
+    const raw = BigInt(hex && hex !== '0x' ? hex : '0x0');
+    const base = 10n ** BigInt(net.decimals);
+    return Number(raw / base) + Number(raw % base) / Number(base);
+  }
+
+  // ---------- Settings ----------
+  function openSettings() {
+    closeWalletModal();
+    $('set-project').value = state.settings.projectId || '';
+    $('set-privy').value = state.settings.privyAppId || '';
+    $('set-origin').textContent = location.origin;
+    document.querySelectorAll('.set-origin-copy').forEach((el) => { el.textContent = location.origin; });
+    $('set-error').classList.add('hidden');
+    $('set-networks').innerHTML = Object.values(USDT).map((n) => `<li><span class="text-slate-200">${n.name}</span> · ${n.address}</li>`).join('');
+    $('settings').classList.remove('hidden');
+  }
+
+  function saveSettings() {
+    const projectId = $('set-project').value.trim();
+    const privyAppId = $('set-privy').value.trim();
+    const fail = (msg) => { $('set-error').textContent = msg; $('set-error').classList.remove('hidden'); };
+    if (privyAppId && !/^[a-z0-9]{20,40}$/i.test(privyAppId)) return fail('The Privy App ID should be 20–40 letters and numbers, e.g. cm1abc…. Copy it from your app on dashboard.privy.io.');
+    if (projectId && !/^[a-z0-9]{32}$/i.test(projectId)) return fail('The Project ID should be 32 letters and numbers. Copy it from your project on cloud.reown.com.');
+    const changed = projectId !== (state.settings.projectId || '') || privyAppId !== (state.settings.privyAppId || '');
+    state.settings = { projectId, privyAppId };
+    storeSettings(state.settings);
+    $('settings').classList.add('hidden');
+    if (changed && (state.kit || privyReady)) {
+      // Privy and AppKit are created once per page, so reload to apply new IDs
+      toast('Reloading with the new settings…');
+      setTimeout(() => location.reload(), 700);
+      return;
+    }
+    toast('Settings saved');
+    renderWallet();
+    // Continue straight to the phone wallet the user picked before setting up
+    if ((privyAppId || projectId) && state.pendingWallet) { const w = state.pendingWallet; state.pendingWallet = null; pickWallet(w); }
+  }
+
+  // ---------- EMVCo / PromptPay parsing ----------
+  // CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF) — the checksum used by Tag 63
+  function crc16(str) {
+    let crc = 0xFFFF;
+    for (let i = 0; i < str.length; i++) {
+      crc ^= str.charCodeAt(i) << 8;
+      for (let j = 0; j < 8; j++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xFFFF : (crc << 1) & 0xFFFF;
+    }
+    return crc.toString(16).toUpperCase().padStart(4, '0');
+  }
+
+  // Parse a flat TLV string: 2-char ID, 2-digit length, value
+  function parseTLV(str) {
+    const out = {};
+    let i = 0;
+    while (i < str.length) {
+      if (i + 4 > str.length) throw new Error('Truncated TLV header at position ' + i);
+      const id = str.substr(i, 2);
+      const lenStr = str.substr(i + 2, 2);
+      if (!/^\d{2}$/.test(lenStr)) throw new Error(`Invalid length "${lenStr}" for tag ${id}`);
+      const len = parseInt(lenStr, 10);
+      const value = str.substr(i + 4, len);
+      if (value.length !== len) throw new Error(`Tag ${id} declares ${len} chars but only ${value.length} remain`);
+      out[id] = value;
+      i += 4 + len;
+    }
+    return out;
+  }
+
+  function formatThaiPhone(raw) {
+    // PromptPay encodes mobiles as 0066XXXXXXXXX (13 chars) -> 0XX-XXX-XXXX
+    let d = raw.replace(/\D/g, '');
+    if (d.startsWith('0066')) d = '0' + d.slice(4);
+    else if (d.startsWith('66') && d.length === 11) d = '0' + d.slice(2);
+    if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+    return d;
+  }
+  const formatTaxId = (d) => d.length === 13 ? `${d[0]}-${d.slice(1, 5)}-${d.slice(5, 10)}-${d.slice(10, 12)}-${d[12]}` : d;
+
+  function parsePromptPay(raw) {
+    // Only strip line breaks: spaces are legal inside values like Tag 59 (merchant name)
+    const str = raw.replace(/[\r\n]+/g, '').trim();
+    if (!str) throw new Error('Empty payload');
+    if (!str.startsWith('000201')) throw new Error('Not an EMVCo QR payload (missing "000201" header)');
+
+    const tags = parseTLV(str);
+
+    // CRC check (Tag 63 must be last and cover everything up to and including "6304")
+    let crcValid = null;
+    if (tags['63']) {
+      const expected = crc16(str.slice(0, -4));
+      crcValid = expected === tags['63'].toUpperCase();
+    }
+
+    let idType, idValue, idDisplay;
+    if (tags['29']) {
+      const sub = parseTLV(tags['29']);
+      if (sub['01']) { idType = 'Mobile number (PromptPay)'; idValue = sub['01']; idDisplay = formatThaiPhone(sub['01']); }
+      else if (sub['02']) { idType = 'National / Tax ID (PromptPay)'; idValue = sub['02']; idDisplay = formatTaxId(sub['02']); }
+      else if (sub['03']) { idType = 'e-Wallet ID (PromptPay)'; idValue = sub['03']; idDisplay = sub['03']; }
+      else if (sub['04']) { idType = 'Bank account (PromptPay)'; idValue = sub['04']; idDisplay = sub['04']; }
+      else throw new Error('Tag 29 present but no recognised proxy ID sub-tag (01–04)');
+    } else if (tags['30']) {
+      const sub = parseTLV(tags['30']);
+      idType = 'Biller ID (Bill Payment)';
+      idValue = sub['01'] || '';
+      idDisplay = idValue + (sub['02'] ? ` · Ref ${sub['02']}` : '');
+      if (!idValue) throw new Error('Tag 30 present but no biller ID');
+    } else {
+      throw new Error('No PromptPay merchant data (Tag 29 / Tag 30) found');
+    }
+
+    if (tags['53'] && tags['53'] !== '764') throw new Error(`Currency ${tags['53']} is not THB (764)`);
+
+    const amount = tags['54'] ? parseFloat(tags['54']) : null;
+    if (tags['54'] && !(amount > 0)) throw new Error('Invalid amount in Tag 54');
+
+    return {
+      raw: str,
+      tags,
+      crcValid,
+      idType, idValue, idDisplay,
+      merchantName: tags['59'] || null,
+      amountFromQR: amount,
+      thb: amount || 0,
+    };
+  }
+
+  // Build a valid sample payload (with correct CRC) for the demo buttons
+  function buildSample({ phone, taxId, amount, name }) {
+    const tlv = (id, v) => id + String(v.length).padStart(2, '0') + v;
+    const proxy = phone ? tlv('01', '0066' + phone.replace(/^0/, '')) : tlv('02', taxId);
+    let p = tlv('00', '01') + tlv('01', amount ? '12' : '11')
+      + tlv('29', tlv('00', 'A000000677010111') + proxy)
+      + tlv('53', '764')
+      + (amount ? tlv('54', amount.toFixed(2)) : '')
+      + tlv('58', 'TH')
+      + (name ? tlv('59', name) : '')
+      + '6304';
+    return p + crc16(p);
+  }
+
+  // ---------- Scanner ----------
+  async function startScanner() {
+    $('parse-error').classList.add('hidden');
+    $('cam-status').classList.remove('hidden');
+    $('cam-status').innerHTML = '<div><div class="mx-auto w-10 h-10 rounded-full border-2 border-shift-400 border-t-transparent animate-spin mb-3"></div>Starting camera…</div>';
+    if (state.scanning) return;
+    if (typeof Html5Qrcode === 'undefined') return camBlocked('QR library failed to load (offline?). Use the fallback below.');
+    try {
+      state.scanner = state.scanner || new Html5Qrcode('reader', scannerOptions());
+      state.scanning = true;
+      $('scan-feedback').classList.add('hidden');
+      // No qrbox: decode the whole frame so the QR doesn't have to sit inside a small box.
+      // Higher resolution matters for laptop webcams reading a QR off a phone screen.
+      await state.scanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 15,
+          videoConstraints: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+        },
+        (decoded) => handlePayload(decoded, 'camera'),
+        () => {}
+      );
+      $('cam-status').classList.add('hidden');
+    } catch (err) {
+      state.scanning = false;
+      camBlocked('Camera unavailable or permission denied. Paste a payload below to continue.');
+    }
+  }
+
+  function scannerOptions() {
+    return {
+      verbose: false,
+      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+    };
+  }
+
+  async function scanImageFile(file) {
+    if (!file) return;
+    if (typeof Html5Qrcode === 'undefined') return showScanFeedback('QR library failed to load.');
+    // A fresh mount node per scan: html5-qrcode can't reuse one after a previous scanFile
+    const host = document.createElement('div');
+    host.id = 'file-reader-' + Date.now();
+    host.hidden = true;
+    $('file-reader').appendChild(host);
+    let decoded = null;
+    try {
+      decoded = await new Html5Qrcode(host.id, scannerOptions()).scanFile(file, false);
+    } catch (_) {
+      showScanFeedback('No QR code found in that image. Try a sharper screenshot that is cropped closer to the QR.');
+    } finally {
+      host.remove();
+    }
+    if (decoded) handlePayload(decoded, 'image');
+  }
+
+  function showScanFeedback(html) {
+    const el = $('scan-feedback');
+    el.innerHTML = html;
+    el.classList.remove('hidden');
+  }
+
+  function camBlocked(msg) {
+    $('cam-status').classList.remove('hidden');
+    $('cam-status').innerHTML = `<div><div class="text-3xl mb-2">📷</div><div class="text-slate-300 font-medium">Camera blocked</div><div class="text-xs mt-1">${msg}</div></div>`;
+  }
+
+  async function stopScanner() {
+    if (state.scanner && state.scanning) {
+      state.scanning = false;
+      try { await state.scanner.stop(); state.scanner.clear(); } catch (_) {}
+    }
+  }
+
+  function handlePayload(raw, source) {
+    try {
+      const p = parsePromptPay(raw);
+      state.payment = p;
+      state.lastRejected = null;
+      $('scan-feedback').classList.add('hidden');
+      if (source === 'camera' && navigator.vibrate) navigator.vibrate(60);
+      renderConfirm();
+      show('confirm');
+    } catch (e) {
+      if (source === 'camera' || source === 'image') {
+        // The QR decoded fine but isn't PromptPay. Say so instead of failing silently.
+        if (state.lastRejected === raw && source === 'camera') return;
+        state.lastRejected = raw;
+        const preview = raw.length > 90 ? raw.slice(0, 90) + '…' : raw;
+        const safe = preview.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        showScanFeedback(`<div class="font-semibold mb-1">QR read, but it isn't a PromptPay code</div><div class="text-amber-200/80">${e.message}</div><div class="mt-2 font-mono text-[10px] text-amber-100/60">${safe}</div>`);
+        return;
+      }
+      $('parse-error').textContent = '⚠ ' + e.message;
+      $('parse-error').classList.remove('hidden');
+    }
+  }
+
+  // ---------- Confirm screen ----------
+  function renderConfirm() {
+    const p = state.payment;
+    const label = p.merchantName || (p.idType.startsWith('Mobile') ? 'PromptPay Mobile' : p.idType.startsWith('National') ? 'PromptPay Tax ID' : 'PromptPay Merchant');
+    $('merchant-name').textContent = label;
+    $('merchant-avatar').textContent = label.trim()[0].toUpperCase();
+    $('merchant-id').textContent = p.idDisplay;
+    $('merchant-id-type').textContent = p.idType;
+
+    const badge = $('crc-badge');
+    if (p.crcValid === true) { badge.textContent = '✓ CRC valid'; badge.className = 'ml-auto text-[10px] font-semibold rounded-full px-2 py-1 bg-emerald-400/10 text-emerald-300'; }
+    else if (p.crcValid === false) { badge.textContent = '⚠ CRC mismatch'; badge.className = 'ml-auto text-[10px] font-semibold rounded-full px-2 py-1 bg-amber-400/10 text-amber-300'; }
+    else { badge.textContent = 'No CRC'; badge.className = 'ml-auto text-[10px] font-semibold rounded-full px-2 py-1 bg-white/5 text-slate-400'; }
+
+    const hasAmount = p.amountFromQR != null;
+    $('amount-fixed').classList.toggle('hidden', !hasAmount);
+    $('amount-input-wrap').classList.toggle('hidden', hasAmount);
+    $('amount-input').value = '';
+    if (!hasAmount) { p.thb = 0; setTimeout(() => $('amount-input').focus(), 350); }
+
+    $('raw-tlv').textContent = Object.entries(p.tags).map(([k, v]) => `${k}: ${v}`).join('\n');
+    resetSlider();
+    updateAmounts();
+  }
+
+  function updateAmounts() {
+    const p = state.payment;
+    if (!p) return;
+    const usdt = p.thb / state.rate;
+    p.usdt = Math.ceil(usdt * 100) / 100; // round up to the cent so the merchant is never short
+    $('amount-thb-display').textContent = fmt(p.thb);
+    $('detail-thb').textContent = fmt(p.thb) + ' THB';
+    $('detail-usdt').textContent = fmt(p.usdt) + ' USDT';
+    $('usdt-hero').textContent = fmt(p.usdt) + ' USDT';
+    $('balance-warning').classList.toggle('hidden', !(state.wallet && p.usdt > state.balance));
+    $('sim-note').classList.toggle('hidden', state.mode !== 'live');
+  }
+
+  // ---------- Slide to pay ----------
+  const slider = $('slider'), knob = $('slider-knob'), fill = $('slider-fill'), sLabel = $('slider-label');
+  let drag = null;
+  const maxX = () => slider.clientWidth - knob.offsetWidth - 12;
+
+  function setKnob(x) {
+    knob.style.transform = `translateX(${x}px)`;
+    fill.style.width = (x + knob.offsetWidth / 2 + 6) + 'px';
+    sLabel.style.opacity = String(Math.max(0, 1 - x / (maxX() * 0.6)));
+  }
+  function resetSlider() {
+    knob.style.transition = fill.style.transition = 'transform .3s ease, width .3s ease';
+    setKnob(0);
+    fill.style.width = '0';
+  }
+
+  knob.addEventListener('pointerdown', (e) => {
+    drag = { startX: e.clientX };
+    knob.setPointerCapture(e.pointerId);
+    knob.style.transition = fill.style.transition = 'none';
+  });
+  knob.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    setKnob(Math.max(0, Math.min(maxX(), e.clientX - drag.startX)));
+  });
+  const endDrag = (e) => {
+    if (!drag) return;
+    const x = Math.max(0, Math.min(maxX(), e.clientX - drag.startX));
+    drag = null;
+    if (x >= maxX() * 0.9) { setKnob(maxX()); confirmPayment(); }
+    else resetSlider();
+  };
+  knob.addEventListener('pointerup', endDrag);
+  knob.addEventListener('pointercancel', endDrag);
+
+  // ---------- Alert ----------
+  function showAlert({ title, body, primary, onPrimary }) {
+    $('alert-title').textContent = title;
+    $('alert-body').textContent = body;
+    const btn = $('alert-primary');
+    btn.textContent = primary || 'OK';
+    btn.onclick = () => { $('alert').classList.add('hidden'); onPrimary && onPrimary(); };
+    $('alert').classList.remove('hidden');
+  }
+
+  // ---------- Settlement ----------
+  function confirmPayment() {
+    const p = state.payment;
+    if (!state.wallet) {
+      resetSlider();
+      return showAlert({ title: 'Wallet not connected', body: 'Connect a non-custodial wallet before confirming this payment.', primary: 'Connect Wallet', onPrimary: openConnect });
+    }
+    if (!(p.thb > 0)) {
+      resetSlider();
+      return showAlert({ title: 'Enter an amount', body: 'This QR has no fixed amount. Type the THB amount to pay.', primary: 'OK', onPrimary: () => $('amount-input').focus() });
+    }
+    if (p.usdt > state.balance) {
+      resetSlider();
+      return showAlert({ title: 'Insufficient balance', body: `You need ${fmt(p.usdt)} USDT but have ${fmt(state.balance)} USDT.`, primary: 'OK' });
+    }
+    runSettlement();
+  }
+
+  function runSettlement() {
+    const steps = [
+      'Signing non-custodial stablecoin transfer...',
+      'Executing atomic swap via SEC-licensed exchange pipeline...',
+      'Pushing automated THB clearing to PromptPay rails...',
+    ];
+    const list = $('steps');
+    list.innerHTML = steps.map((s, i) => `
+      <li id="step-${i}" class="flex items-start gap-3 opacity-40 transition-opacity">
+        <span class="step-icon mt-0.5 w-5 h-5 shrink-0 rounded-full border-2 border-white/20"></span>
+        <span class="text-sm leading-snug">${s}</span>
+      </li>`).join('');
+    $('processing-title').textContent = state.mode === 'live' ? 'Simulating payment (no funds move)' : 'Settling payment';
+    $('processing').classList.remove('hidden');
+
+    const spinner = '<span class="block w-full h-full rounded-full border-2 border-shift-400 border-t-transparent animate-spin"></span>';
+    const check = '<svg viewBox="0 0 24 24" fill="none" stroke="#07090f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+    const STEP_MS = 2500 / steps.length;
+
+    steps.forEach((_, i) => {
+      setTimeout(() => {
+        if (i > 0) markDone(i - 1);
+        const li = $('step-' + i);
+        li.classList.remove('opacity-40');
+        const icon = li.querySelector('.step-icon');
+        icon.className = 'step-icon mt-0.5 w-5 h-5 shrink-0';
+        icon.innerHTML = spinner;
+      }, i * STEP_MS);
+    });
+    function markDone(i) {
+      const icon = $('step-' + i).querySelector('.step-icon');
+      icon.className = 'step-icon mt-0.5 w-5 h-5 shrink-0 rounded-full bg-shift-400 p-0.5';
+      icon.innerHTML = check;
+    }
+    setTimeout(() => {
+      markDone(steps.length - 1);
+      setTimeout(finishPayment, 250);
+    }, 2500);
+  }
+
+  function finishPayment() {
+    const p = state.payment;
+    // Only the demo wallet's balance changes. A real wallet is read-only here: nothing is sent.
+    if (state.mode === 'demo') state.balance = Math.max(0, +(state.balance - p.usdt).toFixed(2));
+    $('success-sim').classList.toggle('hidden', state.mode !== 'live');
+    const hash = '0x' + randomHex(64);
+    const merchant = (p.merchantName ? p.merchantName + ' · ' : '') + p.idDisplay;
+
+    $('success-thb').textContent = fmt(p.thb);
+    $('success-usdt').textContent = fmt(p.usdt);
+    $('success-merchant').textContent = merchant;
+    $('success-hash').textContent = hash;
+    $('success-time').textContent = new Date().toLocaleString();
+    $('processing').classList.add('hidden');
+    show('success');
+
+    $('activity-empty')?.remove();
+    const li = document.createElement('li');
+    li.className = 'flex items-center gap-3 bg-ink-900 border border-white/5 rounded-2xl p-3 fade-in';
+    li.innerHTML = `
+      <div class="w-10 h-10 rounded-xl bg-emerald-400/10 text-emerald-300 grid place-items-center">↗</div>
+      <div class="min-w-0 flex-1"><div class="text-sm font-semibold truncate"></div><div class="text-[11px] text-slate-500 font-mono">${hash.slice(0, 10)}…${hash.slice(-6)}</div></div>
+      <div class="text-right"><div class="text-sm font-semibold">−${fmt(p.usdt)} USDT</div><div class="text-[11px] text-slate-500">${fmt(p.thb)} THB</div></div>`;
+    li.querySelector('.truncate').textContent = merchant;
+    $('activity').prepend(li);
+    renderWallet();
+  }
+
+  // ---------- Wire up events ----------
+  $('btn-connect').addEventListener('click', () => {
+    if (state.mode === 'demo') return disconnectDemo();
+    if (state.mode === 'live' && state.privyWallet) return disconnectPrivy();
+    if (state.mode === 'live' && state.injected) return disconnectInjected();
+    if (state.mode === 'live') return state.kit.modal.open(); // account view: switch network or disconnect
+    openConnect();
+  });
+  $('btn-settings').addEventListener('click', openSettings);
+  $('btn-open-setup').addEventListener('click', openSettings);
+  $('btn-demo-wallet').addEventListener('click', () => connectDemo());
+  $('btn-needs-demo').addEventListener('click', () => connectDemo(state.pendingWallet?.name || 'Demo wallet'));
+  $('btn-needs-back').addEventListener('click', () => showSheetView('wallet-options'));
+  $('btn-more-wallets').addEventListener('click', openAllWallets);
+  $('wallet-search').addEventListener('input', renderWalletList);
+  $('btn-save-settings').addEventListener('click', saveSettings);
+  document.querySelectorAll('[data-close-settings]').forEach((el) => el.addEventListener('click', () => $('settings').classList.add('hidden')));
+  document.querySelectorAll('[data-close-modal]').forEach((el) => el.addEventListener('click', closeWalletModal));
+  document.querySelectorAll('[data-close-alert]').forEach((el) => el.addEventListener('click', () => $('alert').classList.add('hidden')));
+
+  $('btn-scan').addEventListener('click', () => { $('fallback-input').value = ''; show('scan'); });
+  document.querySelector('[data-back]').addEventListener('click', () => show('home'));
+  document.querySelector('[data-back-scan]').addEventListener('click', () => { $('fallback-input').value = ''; show('scan'); });
+
+  // Fallback textarea: parse instantly on paste or on typing a complete payload
+  const fb = $('fallback-input');
+  fb.addEventListener('paste', () => setTimeout(() => handlePayload(fb.value, 'paste'), 0));
+  fb.addEventListener('input', () => {
+    const v = fb.value.trim();
+    $('parse-error').classList.add('hidden');
+    if (/6304[0-9A-Fa-f]{4}$/.test(v)) handlePayload(v, 'paste');
+  });
+  fb.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); handlePayload(fb.value, 'paste'); } });
+
+  $('btn-sample-amount').addEventListener('click', () => {
+    fb.value = buildSample({ phone: '0812345678', amount: 450, name: 'SOMTAM NUA' });
+    handlePayload(fb.value, 'paste');
+  });
+  $('btn-sample-open').addEventListener('click', () => {
+    fb.value = buildSample({ taxId: '0105556123456' });
+    handlePayload(fb.value, 'paste');
+  });
+
+  $('qr-file').addEventListener('change', (e) => { scanImageFile(e.target.files[0]); e.target.value = ''; });
+
+  $('amount-input').addEventListener('input', (e) => {
+    state.payment.thb = Math.max(0, parseFloat(e.target.value) || 0);
+    updateAmounts();
+  });
+
+  $('btn-confirm').addEventListener('click', confirmPayment);
+  $('btn-back-wallet').addEventListener('click', () => { state.payment = null; show('home'); });
+  $('btn-copy-hash').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('success-hash').textContent); toast('Hash copied'); }
+    catch (_) { toast('Copy not available'); }
+  });
+
+  renderWallet();
+  refreshRate();
+  setInterval(refreshRate, 60000);
+  // Restore a previous real-wallet session on load
+  // Restore a previous Privy session (e.g. Edge) on load
+  if (state.settings.privyAppId) initPrivy().catch((e) => console.error(e));
+  else if (state.settings.projectId) initWalletKit().catch((e) => console.error(e));
+})();
+</script>
+</body>
+</html>
